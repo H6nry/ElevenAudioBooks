@@ -6,9 +6,10 @@
 //
 
 import SwiftUI
+import AppKit
 
 
-
+/*
 enum EditFieldEditType {
 	case name
 	case year
@@ -41,6 +42,7 @@ struct ContentView: View {
 					}
 				}.listStyle(SidebarListStyle())
 				
+				//Placeholders
 				Text("AudioBook")
 					.frame(minWidth: 100, idealWidth: 150, maxWidth: 200, maxHeight: .infinity)
 					//.background(Color(red: 222/255, green: 228/255, blue: 234/255, opacity: 1))
@@ -359,5 +361,192 @@ struct EditFieldView: View {
 struct PlayerView: View {
 	var body: some View {
 		Text("hh") //TODO
+	}
+}
+*/
+
+
+
+
+
+// This is a rewrite. Much better, less bugs, cleaner, and I still don't understand 100 % of what it's doing.
+// The core rewrite is to not depend on dictionaries, but rather on arrays. I don't understand why dictionaries won't work, but they don't.
+
+struct ContentView2: View {
+	@EnvironmentObject var viewModel: ViewModel
+	@State private var saveChangesWarningPresented: Bool = false
+	
+	var booksList:Array<AudioBook> {
+		viewModel.audioBooksList.sorted(by: { $0.name < $1.name})
+	}
+	
+	
+	var body: some View {
+		VStack {
+			NavigationView {
+				List(booksList, id: \.id) { book in
+					NavigationLink(destination: AudioBookDetailView2(selectedBook: book)) {
+						Text(book.name)
+					}
+					.contextMenu {
+						Button("View in Finder") {
+							NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: book.pathURL.path)
+						}
+					}
+				}.listStyle(SidebarListStyle())
+				
+				//Placeholders
+				Text("AudioBook")
+					.frame(minWidth: 100, idealWidth: 150, maxWidth: 200, maxHeight: .infinity)
+				Text("Items")
+					.frame(minWidth: 100, idealWidth: 150, maxWidth: 200, maxHeight: .infinity)
+				Text("Edit Item")
+					.frame(minWidth: 100, idealWidth: 150, maxWidth: 200, maxHeight: .infinity)
+			}
+			.frame(minWidth: 800, maxWidth: .infinity, minHeight: 500, maxHeight: .infinity)
+			.toolbar() {
+				ToolbarItem(placement: ToolbarItemPlacement.navigation) {
+					Button(action: {
+						NSApp.keyWindow?.firstResponder?.tryToPerform(#selector(NSSplitViewController.toggleSidebar(_:)), with: nil)
+					}, label: {
+						Image(systemName: "sidebar.leading")
+					}).help("Toggle Side Bar")
+					Spacer()
+				}
+				
+				ToolbarItem() {
+					Button(action: {
+						viewModel.reload()
+					}, label: {
+						Image(systemName: "arrow.triangle.2.circlepath")
+					})
+					.help("Discard changes and reload from Database")
+					.disabled(true)
+				}
+				
+				ToolbarItem() {
+					Button(action: {
+						saveChangesWarningPresented = true
+					}, label: {
+						Image(systemName: "tray.and.arrow.down.fill")
+					})
+					.help("Save changes to Library")
+					.alert(isPresented: $saveChangesWarningPresented, content: {
+						Alert(title: Text("Warning"), message: Text("ibooks-library-delete-kill-warning"), primaryButton: .destructive(Text("I have a Backup. Proceed.")) {
+							viewModel.saveToLibrary()
+						}, secondaryButton: .cancel())
+					})
+				}
+			}
+		}
+	}
+}
+
+
+struct AudioBookDetailView2: View {
+	@EnvironmentObject var viewModel: ViewModel
+	var selectedBook: AudioBook
+	
+	var selectedBookIndex: Int {
+		viewModel.audioBooksList.firstIndex(where: { $0.id == selectedBook.id})!
+	}
+	
+	
+	var body: some View {
+		List {
+			HStack {
+				Text("Name") + Text(":")
+				TextField("Name", text: $viewModel.audioBooksList[selectedBookIndex].name)
+			}
+			HStack {
+				Text("Artist") + Text(":")
+				TextField("Artist", text: $viewModel.audioBooksList[selectedBookIndex].artist)
+			}
+			HStack {
+				Text("Genre") + Text(":")
+				TextField("Genre", text: $viewModel.audioBooksList[selectedBookIndex].genre)
+			}
+			HStack {
+				Text("Year") + Text(":")
+				TextField("Year", text: $viewModel.audioBooksList[selectedBookIndex].year)
+			}
+			
+			NavigationLink(destination: AudioBookItemsView2(selectedBook: selectedBook)) {
+				HStack {
+					Text(selectedBook.name).frame(maxHeight: 50)
+					Spacer()
+					Image(systemName: "chevron.forward").frame(alignment: Alignment.trailing)
+				}
+			}
+		}
+	}
+}
+
+
+struct AudioBookItemsView2: View {
+	@EnvironmentObject var viewModel: ViewModel
+	var selectedBook: AudioBook
+	
+	var selectedBookIndex: Int {
+		viewModel.audioBooksList.firstIndex(where: { $0.id == selectedBook.id})!
+	}
+	
+	var itemsList:Array<AudioBookTrack> {
+		selectedBook.itemsList.sorted(by: { $0.trackNr < $1.trackNr})
+	}
+	
+	
+	var body: some View {
+		List(itemsList, id: \.id) { item in
+			NavigationLink(destination: AudioBookItemDetailView2(selectedBook: selectedBook, selectedItem: item)) {
+				HStack {
+					Text(String(item.trackNr)) + Text(". ") + Text(item.trackTitle)
+					Spacer()
+					Image(systemName: "chevron.forward").frame(alignment: Alignment.trailing)
+				}.frame(maxHeight: 50)
+			}
+		}
+	}
+}
+
+
+struct AudioBookItemDetailView2: View {
+	@EnvironmentObject var viewModel: ViewModel
+	var selectedBook: AudioBook
+	var selectedItem: AudioBookTrack
+	
+	var selectedBookIndex: Int {
+		viewModel.audioBooksList.firstIndex(where: { $0.id == selectedBook.id })!
+	}
+	
+	var selectedItemIndex: Int {
+		viewModel.audioBooksList[selectedBookIndex].itemsList.firstIndex(where: { $0.id == selectedItem.id })!
+	}
+	
+	
+	var body: some View {
+		List {
+			HStack {
+				Text("Track Nr.") + Text(":")
+				TextField("Track Nr.", value: $viewModel.audioBooksList[selectedBookIndex].itemsList[selectedItemIndex].trackNr, formatter: NumberFormatter()) // The NumberFormatter allows an Int as a binding.
+			}
+			HStack {
+				Text("Title") + Text(":")
+				TextField("Title", text: $viewModel.audioBooksList[selectedBookIndex].itemsList[selectedItemIndex].trackTitle)
+			}
+			HStack {
+				Text("Artist") + Text(":")
+				TextField("Artist", text: $viewModel.audioBooksList[selectedBookIndex].itemsList[selectedItemIndex].artist)
+			}
+			HStack {
+				Text("Genre") + Text(":")
+				TextField("Genre", text: $viewModel.audioBooksList[selectedBookIndex].itemsList[selectedItemIndex].genre)
+			}
+			HStack {
+				Text("Year") + Text(":")
+				TextField("Year", text: $viewModel.audioBooksList[selectedBookIndex].itemsList[selectedItemIndex].year)
+			}
+			Image(nsImage: NSImage(data: selectedItem.artwork) ?? NSImage()).resizable().scaledToFit()
+		}
 	}
 }

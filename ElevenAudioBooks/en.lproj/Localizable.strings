@@ -1,4 +1,14 @@
 {
 	"Toggle Side Bar" = "Toggle Side Bar";
 	"ibooks-library-delete-kill-warning" = "iBooks and everything (audio)Books-related is being killed NOW. The iBooks Database is being deleted. Please, backup your system! These changes cannot be reverted!";
+	"Toggle Side Bar" = "Toggle Side Bar";
+	"Save changes to Library" = "Save changes to Library";
+	"Save to Library" = "Save to Library";
+	"Reload from Library" = "Reload from Library";
+	"Name" = "Name";
+	"Artist" = "Artist";
+	"Title" = "Title";
+	"Track Nr." = "Track No.";
+	"Genre" = "Genre";
+	"View in Finder" = "View in Finder";
 }

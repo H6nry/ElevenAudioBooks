@@ -3,9 +3,14 @@
 //  ElevenAudioBooks
 //
 //  Created by H6nry on 12.03.21.
+//  Future Features TODO:
+//  	- Add Player
+//  	- Also Edit ID3 tags
+//  	- Make Arranging tracks easier (drag'n'drop)
 //
 
 import SwiftUI
+import AVFoundation
 
 struct AudioBookTrack: Identifiable {
 	let id = UUID()
@@ -14,8 +19,17 @@ struct AudioBookTrack: Identifiable {
 	var bkGeneratedItemID: String
 	var artist: String
 	var genre: String
-	let path: String
+	let pathURL: URL
 	var trackNr: Int
+	let artwork: Data
+	/*var trackNrString: String {
+		get {
+			String(trackNr)
+		}
+		set(value) {
+			trackNr = Int(value) ?? 0
+		}
+	}*/
 	let plistSkeleton: Dictionary<String, Any>
 }
 
@@ -26,9 +40,16 @@ struct AudioBook: Identifiable {
 	var bkGeneratedItemID: String
 	var artist: String
 	var genre: String
+	
+	var itemsList: Array<AudioBookTrack>
+	
+	@available(*, deprecated, message: "items dictionary shall not be used anymore. Use the array.")
 	var items: Dictionary<UUID, AudioBookTrack>
+	
+	var pathURL: URL
+	
 	let plistSkeleton: Dictionary<String, Any>
-	var itemsSortedByTrackNrThenName: Array<AudioBookTrack> {
+	/*var itemsSortedByTrackNrThenName: Array<AudioBookTrack> {
 		get {
 			let itemsListu:Array<AudioBookTrack> = self.items.map { $0.value }
 			return itemsListu.sorted(by: {
@@ -39,32 +60,105 @@ struct AudioBook: Identifiable {
 				}
 			})
 		}
-	}
+	}*/
 }
 
+enum AudioBookProperty {
+	case name
+	case year
+	case genre
+	case artist
+}
+
+enum AudioBookItemProperty {
+	case name
+	case year
+	case genre
+	case artist
+	case trackNr
+}
+
+
 class ViewModel: ObservableObject {
+	@available(*, deprecated, message: "audioBooks dictionary shall not be used anymore. Use the array.")
 	@Published var audioBooks:Dictionary<UUID, AudioBook> = [:]
+	
+	@Published var audioBooksList:Array<AudioBook> = []
+	//@Published var selectedBook: UUID = UUID()
+	//@Published var selectedItem: UUID = UUID()
+	
 	private var booksPlistSkeleton: Dictionary<String, Any> = [:]
 	
 	
 	init() {
-		print("hello?")
-		/*
-		//Experimental stuff....
-		let connection = NSXPCConnection(machServiceName: "com.apple.BKAgentService", options: NSXPCConnection.Options(rawValue: 0))
-		connection.remoteObjectInterface = NSXPCInterface(with: BKAgentService.self)
-		connection.resume()
+		print("Hello from ElevenAudioBooks. Init of data/view model...")
 		
-		let service = connection.remoteObjectProxyWithErrorHandler { error in
-			  print("Received error:", error)
-			} as? BKAgentService
+		loadAudioBooksListFromLibrary()
+	}
+	
+	func saveToLibrary() -> Void {
+		print("saving to library...")
+		var skeleton = booksPlistSkeleton
 		
+		var booksPlist:Array<Dictionary<String, Any>> = []
+		let books:Array<AudioBook> = audioBooksList
 		
-		service!.fetchBooks({(obj:Any, e:Error) -> Void in
-			print(obj)
-			print(e)
-		})*/
+		for book in books {
+			var dict:Dictionary<String, Any> = book.plistSkeleton
+			
+			dict["itemName"] = book.name
+			dict["year"] = book.year
+			dict["BKGeneratedItemId"] = book.bkGeneratedItemID
+			dict["artistName"] = book.artist
+			dict["genre"] = book.genre
+			
+			var itemsPlist:Array<Dictionary<String, Any>> = []
+			//let items: Array<AudioBookTrack> = book.itemsSortedByTrackNrThenName
+			let items: Array<AudioBookTrack> = book.itemsList.sorted(by: {
+				if ($0.trackNr != $1.trackNr) {
+					return $0.trackNr < $1.trackNr
+				} else {
+					return $0.trackTitle.lowercased() < $1.trackTitle.lowercased()
+			   }
+			})
+			
+			for item in items {
+				var idict:Dictionary<String, Any> = item.plistSkeleton
+				
+				idict["BKTrackTitle"] = item.trackTitle
+				idict["year"] = item.year
+				idict["BKGeneratedItemId"] = item.bkGeneratedItemID
+				idict["artistName"] = item.artist
+				idict["genre"] = item.genre
+				idict["path"] = item.pathURL.path
+				idict["BKTrackNumber"] = item.trackNr
+				
+				itemsPlist.append(idict)
+			}
+			
+			dict["BKParts"] = itemsPlist
+			booksPlist.append(dict)
+		}
+		var skeletonBooks:Array<Any> = skeleton["Books"] as! Array<Any>
+		skeletonBooks.append(contentsOf: booksPlist)
 		
+		skeleton["Books"] = skeletonBooks
+		
+		killiBooksXandRemoveiBooksXSQL()
+		
+		let homeURL = FileManager.default.homeDirectoryForCurrentUser
+		let booksLibraryURL = homeURL.appendingPathComponent("Library/Containers/com.apple.BKAgentService/Data/Documents/iBooks/Books/", isDirectory: true)
+		let booksPlistURL = booksLibraryURL.appendingPathComponent("Books.plist")
+		
+		do {
+			let dataToWrite = try PropertyListSerialization.data(fromPropertyList: skeleton, format: PropertyListSerialization.PropertyListFormat.binary, options: 0)
+			try dataToWrite.write(to: booksPlistURL)
+		} catch {
+			print("error writing file")
+		}
+	}
+	
+	func loadAudioBooksListFromLibrary() -> Void {
 		let homeURL = FileManager.default.homeDirectoryForCurrentUser
 		let booksLibraryURL = homeURL.appendingPathComponent("Library/Containers/com.apple.BKAgentService/Data/Documents/iBooks/Books/", isDirectory: true)
 		let booksPlistURL = booksLibraryURL.appendingPathComponent("Books.plist")
@@ -95,7 +189,8 @@ class ViewModel: ObservableObject {
 		}
 		
 		let books:[Dictionary] = bplist["Books"] as! [Dictionary<String, Any>]
-		var booksv:Array<Dictionary<String, Any>> = [] //The part of books which won't be processed by ElevenAudioBooks
+		var booksv:Array<Dictionary<String, Any>> = [] //The part of the books plist which won't be processed by ElevenAudioBooks
+		var audioBooksListTemp:Array<AudioBook> = []
 		
 		for book in books {
 			let type = book["BKBookType"] as! String
@@ -105,6 +200,7 @@ class ViewModel: ObservableObject {
 				let id = book["BKGeneratedItemId"] as! String
 				let artist = book["artistName"] as! String
 				let genre = book["genre"] as! String
+				let pathURL = URL(string: book["path"] as! String) ?? URL(string:"")!
 				
 				// Remove all indexed keys and values, to store the rest for later
 				var bookv = book
@@ -113,6 +209,7 @@ class ViewModel: ObservableObject {
 				bookv.removeValue(forKey: "BKGeneratedItemId")
 				bookv.removeValue(forKey: "artistName")
 				bookv.removeValue(forKey: "genre")
+				bookv.removeValue(forKey: "path")
 				
 				var items:Dictionary<UUID, AudioBookTrack> = [:]
 				let bkparts = book["BKParts"] as! Array<Dictionary<String, Any>>
@@ -123,8 +220,12 @@ class ViewModel: ObservableObject {
 					let bkGeneratedItemID = item["BKGeneratedItemId"] as! String
 					let artist = item["artistName"] as! String
 					let genre = item["genre"] as! String
-					let path = item["path"] as! String
+					let pathURL = URL(fileURLWithPath: item["path"] as! String? ?? "")
 					let tracknr = item["BKTrackNumber"] as! Int
+					
+					let playerItemMetadata = AVPlayerItem(url: pathURL).asset.metadata
+					let artwork = playerItemMetadata.first(where: { $0.commonKey == .commonKeyArtwork})?.value as! Data //Special case, as it's not in the database.
+					
 					
 					// Remove all indexed keys and values, to store the rest for later
 					var itemv = item
@@ -136,22 +237,15 @@ class ViewModel: ObservableObject {
 					itemv.removeValue(forKey: "path")
 					itemv.removeValue(forKey: "BKTrackNumber")
 					
-					let track = AudioBookTrack(trackTitle: trackTitle, year: year, bkGeneratedItemID: bkGeneratedItemID, artist: artist, genre: genre, path: path, trackNr: tracknr, plistSkeleton: itemv)
+					let track = AudioBookTrack(trackTitle: trackTitle, year: year, bkGeneratedItemID: bkGeneratedItemID, artist: artist, genre: genre, pathURL: pathURL, trackNr: tracknr, artwork: artwork, plistSkeleton: itemv)
 					
 					items[track.id] = track
 				}
+				let itemsList: Array<AudioBookTrack> = Array(items.values.map { $0 })
 				
+				let audiobook = AudioBook(name: name, year: year, bkGeneratedItemID: id, artist: artist, genre: genre, itemsList: itemsList, items: items, pathURL: pathURL, plistSkeleton: bookv)
 				
-				let audiobook = AudioBook(name: name, year: year, bkGeneratedItemID: id, artist: artist, genre: genre, items: items, plistSkeleton: bookv)
-				/*let audiobook = AudioBook()
-				audiobook.name = name
-				audiobook.year = year
-				audiobook.bkGeneratedItemID = id
-				audiobook.artist = artist
-				audiobook.genre = genre
-				audiobook.items = items*/
-				
-				audioBooks[audiobook.id] = audiobook
+				audioBooksListTemp.append(audiobook)
 			} else {
 				booksv.append(book)
 			}
@@ -160,90 +254,21 @@ class ViewModel: ObservableObject {
 		//Put the unused books into the plist dict, removing everything else
 		bplist["Books"] = booksv
 		booksPlistSkeleton = bplist
-		//print(booksPlistSkeleton)
 		
+		//Put the audioBooksListTemp into the published var audioBooksList
+		audioBooksList = audioBooksListTemp
 		
-		
-		//Get values, modify, merge, etc.
-		/*var books:[Dictionary] = bplist?["Books"] as! [Dictionary<String, Any>]
-		print(books[11]["itemName"] as Any)
-		books[11]["itemName"] = "Döner Schäfchentangol"
-		
-		
-		bplist!["Books"] = books
-		
-		//Write the dictionary back to file
-		do {
-			let dataToWrite = try PropertyListSerialization.data(fromPropertyList: bplist ?? "", format: PropertyListSerialization.PropertyListFormat.binary, options: 0)
-			try dataToWrite.write(to: booksPlistURL)
-		} catch {
-			print("error writing file")
-		}*/
-	}
-	
-	func saveToLibrary() -> Void {
-		print("saving to library...")
-		var skeleton = booksPlistSkeleton
-		
-		var booksPlist:Array<Dictionary<String, Any>> = []
-		let books:Array<AudioBook> = audioBooks.map { $0.value }
-		
-		for book in books {
-			var dict:Dictionary<String, Any> = book.plistSkeleton
-			
-			dict["itemName"] = book.name
-			dict["year"] = book.year
-			dict["BKGeneratedItemId"] = book.bkGeneratedItemID
-			dict["artistName"] = book.artist
-			dict["genre"] = book.genre
-			
-			var itemsPlist:Array<Dictionary<String, Any>> = []
-			let items: Array<AudioBookTrack> = book.itemsSortedByTrackNrThenName
-			
-			for item in items {
-				var idict:Dictionary<String, Any> = item.plistSkeleton
-				
-				idict["BKTrackTitle"] = item.trackTitle
-				idict["year"] = item.year
-				idict["BKGeneratedItemId"] = item.bkGeneratedItemID
-				idict["artistName"] = item.artist
-				idict["genre"] = item.genre
-				idict["path"] = item.path
-				idict["BKTrackNumber"] = item.trackNr
-				
-				itemsPlist.append(idict)
-			}
-			
-			dict["BKParts"] = itemsPlist
-			booksPlist.append(dict)
-		}
-		var skeletonBooks:Array<Any> = skeleton["Books"] as! Array<Any>
-		skeletonBooks.append(contentsOf: booksPlist)
-		
-		skeleton["Books"] = skeletonBooks
-		
-		//print(skeleton)
-		
-		killiBooksXandRemoveiBooksXSQL()
-		
-		let homeURL = FileManager.default.homeDirectoryForCurrentUser
-		let booksLibraryURL = homeURL.appendingPathComponent("Library/Containers/com.apple.BKAgentService/Data/Documents/iBooks/Books/", isDirectory: true)
-		let booksPlistURL = booksLibraryURL.appendingPathComponent("Books.plist")
-		
-		do {
-			let dataToWrite = try PropertyListSerialization.data(fromPropertyList: skeleton, format: PropertyListSerialization.PropertyListFormat.binary, options: 0)
-			try dataToWrite.write(to: booksPlistURL)
-		} catch {
-			print("error writing file")
-		}
-		
-		
+		//print("TODO: Convert Array back to dict!!!")
+		//audioBooksList = Array(audioBooks.values.map{ $0 })
 	}
 	
 	func reload() -> Void {
-		print("reloading... todo") //TODO
+		print("reloading discarding any edits... TODO") //TODO
+		//audioBooksList = []
+		//loadAudioBooksListFromLibrary() //NOT VERKING AT THE MOMENT
 	}
 	
+	// Commit changes to the Library. This is very rude, and I hope there's a better way.
 	func killiBooksXandRemoveiBooksXSQL() -> Void {
 		shell("killall Books")
 		shell("PROZID=$(pgrep com.apple.BKAgentService); kill -9 $PROZID")
@@ -290,13 +315,15 @@ class ViewModel: ObservableObject {
 
 @main
 struct ElevenAudioBooksApp: App {
-	@StateObject var viewModel  = ViewModel()
-	@State private var selectedBook: UUID? = UUID()
-	@State private var selectedItem: UUID? = UUID()
+	@StateObject private var viewModel  = ViewModel()
+	//@State private var selectedBook: UUID? = UUID()
+	//@State private var selectedItem: UUID? = UUID()
 	
     var body: some Scene {
         WindowGroup {
-			ContentView(viewModel: viewModel, selectedBook: $selectedBook, selectedItem: $selectedItem)
+			//ContentView(viewModel: viewModel, selectedBook: $selectedBook, selectedItem: $selectedItem)
+			ContentView2()
+				.environmentObject(viewModel)
 		}.commands {
 			SidebarCommands()
 			CommandGroup(after: CommandGroupPlacement.saveItem, addition: {
@@ -305,7 +332,7 @@ struct ElevenAudioBooksApp: App {
 				}
 				Button("Reload from Library") {
 					viewModel.reload()
-				}
+				}.disabled(true)
 			})
 		}
     }

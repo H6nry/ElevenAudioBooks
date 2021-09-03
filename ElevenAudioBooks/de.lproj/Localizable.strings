@@ -2,4 +2,14 @@
 	"Toggle Side Bar" = "Seitenleiste ein-/ausblenden";
 	"Discard changes and reload from Database" = "Änderungen verwerfen und aus Datenbank neu laden";
 	"ibooks-library-delete-kill-warning" = "iBooks und alle zugehörigen (Bücher-)Apps werden JETZT geschlossen. Die Bücher-Datenbank wird gelöscht. Bitte erstellen Sie ein Backup! Diese Änderungen können nicht rückgängig gemacht werden!";
+	"Toggle Side Bar" = "Seitenleiste ein-/ausblenden";
+	"Save changes to Library" = "Änderungen in die Datenbank speichern";
+	"Save to Library" = "Sichern in Datenbank";
+	"Reload from Library" = "Neu laden aus Datenbank";
+	"Name" = "Name";
+	"Artist" = "Künstler";
+	"Title" = "Titel";
+	"Track Nr." = "Titel Nr.";
+	"Genre" = "Genre";
+	"View in Finder" = "In Finder ansehen";
 }
