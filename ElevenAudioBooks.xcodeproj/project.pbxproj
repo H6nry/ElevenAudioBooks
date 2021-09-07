@@ -419,7 +419,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"ElevenAudioBooks/Preview Content\"";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 6688378HJB;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = ElevenAudioBooks/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -427,6 +427,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.1.1;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = org.h6nry.ElevenAudioBooks;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -448,7 +449,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"ElevenAudioBooks/Preview Content\"";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 6688378HJB;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = ElevenAudioBooks/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -456,6 +457,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.1.1;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = org.h6nry.ElevenAudioBooks;
 				PRODUCT_NAME = "$(TARGET_NAME)";

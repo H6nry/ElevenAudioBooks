@@ -111,6 +111,7 @@ class ViewModel: ObservableObject {
 			dict["BKGeneratedItemId"] = book.bkGeneratedItemID
 			dict["artistName"] = book.artist
 			dict["genre"] = book.genre
+			dict["path"] = book.pathURL.path
 			
 			var itemsPlist:Array<Dictionary<String, Any>> = []
 			//let items: Array<AudioBookTrack> = book.itemsSortedByTrackNrThenName
@@ -193,14 +194,14 @@ class ViewModel: ObservableObject {
 		var audioBooksListTemp:Array<AudioBook> = []
 		
 		for book in books {
-			let type = book["BKBookType"] as! String
+			let type = book["BKBookType"] as! String? ?? ""
 			if type == "audiobook" {
-				let name = book["itemName"] as! String
-				let year = book["year"] as! String
-				let id = book["BKGeneratedItemId"] as! String
-				let artist = book["artistName"] as! String
-				let genre = book["genre"] as! String
-				let pathURL = URL(string: book["path"] as! String) ?? URL(string:"")!
+				let name = book["itemName"] as! String? ?? ""
+				let year = book["year"] as! String? ?? ""
+				let id = book["BKGeneratedItemId"] as! String? ?? ""
+				let artist = book["artistName"] as! String? ?? ""
+				let genre = book["genre"] as! String? ?? ""
+				let pathURL = URL(fileURLWithPath: book["path"] as! String? ?? "")
 				
 				// Remove all indexed keys and values, to store the rest for later
 				var bookv = book
@@ -215,13 +216,13 @@ class ViewModel: ObservableObject {
 				let bkparts = book["BKParts"] as! Array<Dictionary<String, Any>>
 				
 				for item in bkparts {
-					let trackTitle = item["BKTrackTitle"] as! String
-					let year = item["year"] as! String
-					let bkGeneratedItemID = item["BKGeneratedItemId"] as! String
-					let artist = item["artistName"] as! String
-					let genre = item["genre"] as! String
+					let trackTitle = item["BKTrackTitle"] as! String? ?? ""
+					let year = item["year"] as! String? ?? ""
+					let bkGeneratedItemID = item["BKGeneratedItemId"] as! String? ?? ""
+					let artist = item["artistName"] as! String? ?? ""
+					let genre = item["genre"] as! String? ?? ""
 					let pathURL = URL(fileURLWithPath: item["path"] as! String? ?? "")
-					let tracknr = item["BKTrackNumber"] as! Int
+					let tracknr = item["BKTrackNumber"] as! Int? ?? 0
 					
 					let playerItemMetadata = AVPlayerItem(url: pathURL).asset.metadata
 					let artwork = playerItemMetadata.first(where: { $0.commonKey == .commonKeyArtwork})?.value as! Data //Special case, as it's not in the database.
